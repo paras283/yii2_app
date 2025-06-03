@@ -21,7 +21,7 @@ jobs:
       - name: Deploy via SSH
         run: |
           ssh -o StrictHostKeyChecking=no -i private_key ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-            docker pull your-dockerhub-username/yii2-app:latest
-            docker service update --image parasgupta283/yii2-app:latest yii2-app-yii2-app || \
-            docker service create --name yii2-app-yii2-app -p 8080:80 parasgupta283/yii2-app:latest
+            docker pull parasgupta283/yii2-app:latest
+            docker service update --image parasgupta283/yii2-app:latest yii2-web || \
+            docker service create --name yii2-web -p 8080:80 parasgupta283/yii2-app:latest
           EOF
