@@ -1,80 +1,45 @@
-on:
-  - pull_request
-  - push
+name: Build & Deploy Yii2 App
 
-name: build
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  tests:
-    name: PHP ${{ matrix.php }} - ${{ matrix.os }}
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
-    env:
-      extensions: dom, json, gd, imagick
-      key: cache-v1
-
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-
-        php:
-          - "7.4"
-          - "8.0"
-          - "8.1"
-          
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup cache environment
-        id: cache-env
-        uses: shivammathur/cache-extensions@v1
-        with:
-          php-version: ${{ matrix.php }}
-          extensions: ${{ env.extensions }}
-          key: ${{ env.key }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Cache extensions
-        uses: actions/cache@v1
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          path: ${{ steps.cache-env.outputs.dir }}
-          key: ${{ steps.cache-env.outputs.key }}
-          restore-keys: ${{ steps.cache-env.outputs.key }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Install PHP with extensions
-        uses: shivammathur/setup-php@v2
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
         with:
-          php-version: ${{ matrix.php }}
-          extensions: ${{ env.extensions }}
-          ini-values: date.timezone='UTC'
-          
-      - name: Determine composer cache directory on Linux
-        if: matrix.os == 'ubuntu-latest'
+          context: .
+          file: Dockerfile
+          push: true
+          tags: parasgupta283/yii2-app:latest
+
+      - name: Set up SSH key
         run: |
-            echo "COMPOSER_CACHE_DIR=$(composer config cache-dir)" >> $GITHUB_ENV
+          echo "${{ secrets.PRIVATE_KEY }}" > private_key.pem
+          chmod 600 private_key.pem
 
-      - name: Determine composer cache directory on Windows
-        if: matrix.os == 'windows-latest'
+      - name: Deploy to EC2 via SSH
         run: |
-            echo "COMPOSER_CACHE_DIR=~\AppData\Local\Composer" >> $GITHUB_ENV
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            docker pull parasgupta283/yii2-app:latest
+            docker service update --image parasgupta283/yii2-app:latest yii2-web || \
+            docker service create --name yii2-web -p 8080:80 parasgupta283/yii2-app:latest
+          EOF
 
-      - name: Cache dependencies installed with composer
-        uses: actions/cache@v1
-        with:
-          path: ${{ steps.cache-env.outputs.dir }}
-          key: php${{ matrix.php }}-composer-${{ matrix.dependencies }}-${{ hashFiles('**/composer.json') }}
-          restore-keys: |
-            php${{ matrix.php }}-composer-${{ matrix.dependencies }}-
-
-      - name: Install dependencies with composer php PHP [5.6 - 8.0]
-        run: composer update --prefer-dist --no-interaction --no-progress --optimize-autoloader --ansi
-
-      - name: Run tests with codeception
-        run: |
-          sed -i "s/'cookieValidationKey' => ''/'cookieValidationKey' => 'testkey'/" config/web.php
-          php -S 127.0.0.1:8080 -t public > ./runtime/yii.log 2>&1 &
-          vendor/bin/codecept run
-        shell: bash
