@@ -1,0 +1,61 @@
+- name: Setup Yii2 Docker Swarm Stack
+  hosts: webserver
+  become: yes
+  vars:
+    docker_compose_version: "v2.24.6"
+    app_repo: "https://github.com/paras283/yii2_app.git"
+    app_dir: "/opt/yii2-app"
+  tasks:
+
+    - name: Update APT
+      apt:
+        update_cache: yes
+
+    - name: Install Docker and dependencies
+      apt:
+        name:
+          - docker.io
+          - git
+          - nginx
+          - php-cli
+          - php-mbstring
+        state: present
+
+    - name: Enable Docker
+      systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Download Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Verify Docker Compose installation
+      command: docker-compose --version
+
+    - name: Initialize Docker Swarm
+      shell: docker swarm init
+      register: swarm_status
+      failed_when: false
+
+    - name: Clone the Yii2 App repository
+      git:
+        repo: "{{ app_repo }}"
+        dest: "{{ app_dir }}"
+        version: main
+
+    - name: Copy NGINX reverse proxy config
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/default
+
+    - name: Restart NGINX
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Deploy Yii2 app with Docker Swarm
+      shell: docker stack deploy -c {{ app_dir }}/docker-compose.yml yii2app
