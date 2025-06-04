@@ -74,6 +74,27 @@ You should see the Yii2 application home page.
 
 6. Updates the Docker Swarm service
 
+
+### Node Exporter for System Metrics
+
+To monitor the host machine’s system metrics (CPU, memory, disk, network, etc.), we use **Node Exporter**, which exports these metrics in a format Prometheus can scrape.
+
+
+
+## Monitoring with Prometheus
+
+This project uses **Prometheus** for monitoring metrics.
+
+### Running Prometheus
+
+You can run Prometheus easily using Docker:
+
+bash
+docker run -d -p 9090:9090 --name prometheus prom/prometheus
+
+Prometheus will be accessible at http://localhost:9090
+
+
 ## Secrets used:
 
 1. USERNAME
