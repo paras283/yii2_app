@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  yii2-app:
-    build: .
+  yii2-web:
+    image: parasgupta283/yii2-app:latest
     ports:
       - "8080:80"
     restart: unless-stopped
