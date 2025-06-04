@@ -6,3 +6,15 @@ services:
     ports:
       - "8080:80"
     restart: unless-stopped
+
+services:
+  yii2-app:
+    image: parasgupta283/yii2-app:latest
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
